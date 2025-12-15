@@ -14,16 +14,24 @@ WINDOW_TITLE = "War"  # Target window name
 CAPTURE_REGION = None  # Will be set dynamically based on window
 
 SALVAGE_TEMPLATES = [
-    "Templates/Salvage_1.png",
-    "Templates/Salvage_2.png",
-    "Templates/Salvage_3.png",
-    "Templates/Salvage_4.png",
-    "Templates/Salvage_5.png",
-    "Templates/Salvage_6.png",
-    "Templates/Salvage_7.png",
-    "Templates/Salvage_8.png",
-    "Templates/Salvage_9.png",
-    "Templates/Salvage_10.png"
+    "Templates/T1-GL1",
+    "Templates/T1-GL2",
+    "Templates/T1-GL3",
+    "Templates/T1-GL4",
+    "Templates/T1-GL5",
+    "Templates/T1-GL6",
+    "Templates/T2-GL1",
+    "Templates/T2-GL2",
+    "Templates/T2-GL3",
+    "Templates/T2-GL4",
+    "Templates/T2-GL5",
+    "Templates/T2-GL6",
+    "Templates/T3-GL1",
+    "Templates/T3-GL2",
+    "Templates/T3-GL3",
+    "Templates/T3-GL4",
+    "Templates/T3-GL5",
+    "Templates/T3-GL6"
 ]
 
 NOTIFICATION_TEMPLATES = [
