@@ -14,24 +14,24 @@ WINDOW_TITLE = "War"  # Target window name
 CAPTURE_REGION = None  # Will be set dynamically based on window
 
 SALVAGE_TEMPLATES = [
-    "Templates/T1-GL1",
-    "Templates/T1-GL2",
-    "Templates/T1-GL3",
-    "Templates/T1-GL4",
-    "Templates/T1-GL5",
-    "Templates/T1-GL6",
-    "Templates/T2-GL1",
-    "Templates/T2-GL2",
-    "Templates/T2-GL3",
-    "Templates/T2-GL4",
-    "Templates/T2-GL5",
-    "Templates/T2-GL6",
-    "Templates/T3-GL1",
-    "Templates/T3-GL2",
-    "Templates/T3-GL3",
-    "Templates/T3-GL4",
-    "Templates/T3-GL5",
-    "Templates/T3-GL6"
+    "Templates/T1-GL1.png",
+    "Templates/T1-GL2.png",
+    "Templates/T1-GL3.png",
+    "Templates/T1-GL4.png",
+    "Templates/T1-GL5.png",
+    "Templates/T1-GL6.png",
+    "Templates/T2-GL1.png",
+    "Templates/T2-GL2.png",
+    "Templates/T2-GL3.png",
+    "Templates/T2-GL4.png",
+    "Templates/T2-GL5.png",
+    "Templates/T2-GL6.png",
+    "Templates/T3-GL1.png",
+    "Templates/T3-GL2.png",
+    "Templates/T3-GL3.png",
+    "Templates/T3-GL4.png",
+    "Templates/T3-GL5.png",
+    "Templates/T3-GL6.png"
 ]
 
 NOTIFICATION_TEMPLATES = [
@@ -170,37 +170,45 @@ def move_and_mine(node_pos, frame_shape):
     dx = x - center_x
     dy = y - center_y
     
+    # Calculate distance to node
+    distance = (dx**2 + dy**2)**0.5
+    
     # Determine movement direction based on node position
     # Custom keybinds: up=z, down=s, left=q, right=d
-    move_duration = 0.8
+    # Move longer for farther nodes
+    move_duration = min(2.0, 0.5 + (distance / 400))
     
     # Determine which keys to press (can be multiple for diagonal movement)
     keys_to_press = []
     
     # Horizontal movement
-    if abs(dx) > 50:  # threshold to avoid tiny movements
+    if abs(dx) > 30:  # lower threshold for better accuracy
         if dx > 0:  # node is to the right
             keys_to_press.append("d")
         else:  # node is to the left
             keys_to_press.append("q")
     
     # Vertical movement
-    if abs(dy) > 50:  # threshold to avoid tiny movements
+    if abs(dy) > 30:  # lower threshold for better accuracy
         if dy > 0:  # node is below center (move down)
             keys_to_press.append("s")
         else:  # node is above center (move up)
             keys_to_press.append("z")
     
-    # Press all movement keys simultaneously
+    # Press all movement keys simultaneously - run to the node
     if keys_to_press:
-        print(f"Moving towards node using keys: {keys_to_press}")
+        print(f"Running to node (distance: {distance:.0f}px) using keys: {keys_to_press}")
         for key in keys_to_press:
             pyautogui.keyDown(key)
         time.sleep(move_duration)
         for key in keys_to_press:
             pyautogui.keyUp(key)
+        
+        # Small pause to stabilize
+        time.sleep(0.3)
 
-    # Mining
+    # Start mining
+    print("Starting mining...")
     pyautogui.mouseDown()
     time.sleep(MINE_TIME)
     pyautogui.mouseUp()
@@ -238,6 +246,7 @@ def explore():
 # MAIN LOOP
 # =========================
 state = "SEARCH"
+miss_count = 0  # consecutive frames without node while mining
 print("✅ Bot gestart — Druk CTRL+C om te stoppen")
 
 try:
@@ -263,29 +272,25 @@ try:
                 explore()  # Run to find a node
 
         elif state == "MINE":
-            # Keep mining until node disappears
+            # Keep hammering while node is present and inventory not full
             found, pos = find_node(frame)
-            if found and not is_ignored(frame):
-                # Node still exists, check if gathering is happening
-                if status == "MINING":
-                    # Gathering salvage, keep mining
-                    print("⛏️ Hammering node...")
-                    pyautogui.mouseDown()
-                    time.sleep(0.3)
-                    pyautogui.mouseUp()
-                    time.sleep(0.2)
-                elif status == "FULL":
-                    state = "DELIVER"
-                else:
-                    # Node found but not gathering, search again
-                    print("❌ Node not gathering, searching again...")
-                    state = "SEARCH"
-            elif status == "FULL":
+            if status == "FULL":
                 state = "DELIVER"
+                miss_count = 0
+            elif found and not is_ignored(frame):
+                print("⛏️ Hammering node...")
+                pyautogui.mouseDown()
+                time.sleep(0.3)
+                pyautogui.mouseUp()
+                time.sleep(0.2)
+                miss_count = 0
             else:
-                # Node disappeared or inventory full
-                print("✅ Node mined, returning to search...")
-                state = "SEARCH"
+                # Require several consecutive misses before leaving mine state
+                miss_count += 1
+                if miss_count >= 3:
+                    print("✅ Node mined or lost, returning to search...")
+                    state = "SEARCH"
+                    miss_count = 0
 
         elif state == "DELIVER":
             deliver()
