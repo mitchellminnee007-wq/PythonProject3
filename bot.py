@@ -206,10 +206,29 @@ def deliver():
     pyautogui.click()
     time.sleep(1)
 
+def explore():
+    """Move in multiple directions to explore and find nodes"""
+    import random
+    
+    directions = {
+        "z": "up",
+        "s": "down", 
+        "q": "left",
+        "d": "right"
+    }
+    
+    # Choose a random direction
+    key = random.choice(list(directions.keys()))
+    direction = directions[key]
+    
+    print(f"🔍 No node found, exploring {direction}...")
+    pyautogui.keyDown(key)
+    time.sleep(1)
+    pyautogui.keyUp(key)
+
 # =========================
 # MAIN LOOP
 # =========================
-
 state = "SEARCH"
 print("✅ Bot gestart — Druk CTRL+C om te stoppen")
 
@@ -231,17 +250,33 @@ try:
                     state = "MINE"
                 else:
                     print("Node genegeerd, blijft zoeken...")
-                    pass
+                    explore()
             else:
-                pass  # blijft stil
+                explore()  # Run to find a node
 
         elif state == "MINE":
-            if status == "FULL":
+            # Keep mining until node disappears
+            found, pos = find_node(frame)
+            if found and not is_ignored(frame):
+                # Node still exists, check if gathering is happening
+                if status == "MINING":
+                    # Gathering salvage, keep mining
+                    print("⛏️ Hammering node...")
+                    pyautogui.mouseDown()
+                    time.sleep(0.3)
+                    pyautogui.mouseUp()
+                    time.sleep(0.2)
+                elif status == "FULL":
+                    state = "DELIVER"
+                else:
+                    # Node found but not gathering, search again
+                    print("❌ Node not gathering, searching again...")
+                    state = "SEARCH"
+            elif status == "FULL":
                 state = "DELIVER"
-            elif status == "MINING":
-                print("🛠️ Bot blijft minen op deze node...")
-                time.sleep(0.5)
             else:
+                # Node disappeared or inventory full
+                print("✅ Node mined, returning to search...")
                 state = "SEARCH"
 
         elif state == "DELIVER":
