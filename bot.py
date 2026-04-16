@@ -57,18 +57,24 @@ def get_foxhole_window():
 CAPTURE_REGION = get_foxhole_window()
 
 # Discord Webhook
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1493763164960063598/sCvNFZGarHxsc1OQ5YRT5xFvJiLI7pM0LpD6owHYdAVDW0PnvJU9I8Vzk8v_cNEOxJFX"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1494340561598152724/Ud7tSFP_ht9LoOWAYZaWdSUBRjFBFLUDsyt_qUZvoZP8Ei8Xb5JrHIvowtOb1BTUXbBu"
 
-# Blue color detection (HSV range for blue)
+# Blue color detection (HSV range for magenta/pink only - NO BLUE)
 # OpenCV uses H: 0-180, S: 0-255, V: 0-255
-BLUE_LOWER = np.array([100, 80, 120])    # Lower bound for blue (lighter blues)
-BLUE_UPPER = np.array([135, 255, 255])   # Upper bound for blue (wider range)
+BLUE_LOWER = np.array([145, 100, 100])    # Lower bound (magenta/pink only - excludes blue)
+BLUE_UPPER = np.array([170, 255, 255])    # Upper bound (magenta/pink only)
 
 # Green color detection (to exclude)
-GREEN_LOWER = np.array([35, 80, 80])     # Lower bound for green
-GREEN_UPPER = np.array([85, 255, 255])   # Upper bound for green
+GREEN_LOWER = np.array([40, 100, 100])   # Lower bound for green
+GREEN_UPPER = np.array([80, 255, 255])   # Upper bound for green
 
-MIN_BLUE_AREA = 30  # Minimum pixel area to count as a blue dot (very small for tiny dots)
+# Red color detection (to exclude) - covers both low and high hue red/pink/magenta
+RED_LOWER = np.array([0, 100, 100])      # Lower bound for red
+RED_UPPER = np.array([15, 255, 255])     # Upper bound for red
+RED_HIGH_LOWER = np.array([150, 100, 100])  # High hue red/magenta/pink
+RED_HIGH_UPPER = np.array([180, 255, 255])  # High hue red/magenta/pink
+
+MIN_BLUE_AREA = 20  # Minimum pixel area to count as a blue dot (more selective)
 MAX_BLUE_AREA = 50000  # Maximum pixel area
 
 # Ignore templates (blue objects to skip)
@@ -76,7 +82,8 @@ IGNORE_TEMPLATES = [
     "Nono/Legend.png",
     "Nono/StateOfWar.png",
     "Nono/green dot.png",
-    "Nono/water icon.png"
+    "Nono/water icon.png",
+    "Nono/image.png"
 ]
 
 sct = mss()
@@ -87,7 +94,9 @@ sct = mss()
 
 def get_screen():
     img = sct.grab(CAPTURE_REGION)
-    return np.array(img)
+    # mss returns RGBA, convert to BGR for OpenCV
+    img_array = np.array(img)
+    return cv2.cvtColor(img_array, cv2.COLOR_RGBA2BGR)
 
 # =========================
 # BLUE DOT/PLANE DETECTION
@@ -107,8 +116,12 @@ def find_blue_objects(frame):
     # Create mask for green colors (to exclude)
     green_mask = cv2.inRange(hsv, GREEN_LOWER, GREEN_UPPER)
     
-    # Subtract green from blue (keep only blue, not green)
+    # Create mask for red colors (to exclude) - only strictly red icons
+    red_mask = cv2.inRange(hsv, RED_LOWER, RED_UPPER)
+    
+    # Subtract green and red from blue
     mask = cv2.subtract(blue_mask, green_mask)
+    mask = cv2.subtract(mask, red_mask)
     
     # Apply morphological operations to clean up the mask
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -189,8 +202,8 @@ def send_discord_notification(blue_objects, frame, frame_shape):
     annotated_frame = frame.copy()
     
     # Draw UI region boundary box (the area being ignored)
-    ui_x_max = 500
-    ui_y_max = 400
+    ui_x_max = 600
+    ui_y_max = 625
     cv2.rectangle(annotated_frame, (0, 0), (ui_x_max, ui_y_max), (0, 165, 255), 3)  # Orange box
     cv2.putText(annotated_frame, "IGNORED UI REGION", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
     
@@ -208,10 +221,8 @@ def send_discord_notification(blue_objects, frame, frame_shape):
         
         print(f"      Box coords: ({x1}, {y1}) to ({x2}, {y2})")
         
-        # Draw purple rectangle around blue dot
-        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 255), 4)
-        # Draw yellow circle at center
-        cv2.circle(annotated_frame, (x, y), 10, (0, 255, 255), -1)
+        # Draw pink rectangle border around detected dot
+        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 0, 255), 4)  # Magenta/hot pink border
     
     # Save annotated screenshot
     image_path = "blue_detection_screenshot.png"
@@ -240,6 +251,7 @@ def send_discord_notification(blue_objects, frame, frame_shape):
     }
     
     payload = {
+        "content": "<@&1493874821531045969>",
         "embeds": [embed]
     }
     
@@ -270,16 +282,17 @@ def move_to_blue_object(x, y):
     """
     Moves mouse to a detected blue object.
     """
-    frame = get_screen()
-    h, w = frame.shape[:2]
-    
-    dx = x - w // 2
-    dy = y - h // 2
-    dx = max(min(dx, 1000), -1000)
-    dy = max(min(dy, 500), -500)
-    
-    pyautogui.moveRel(dx, dy, duration=0.2)
-    print(f"🎯 Tracking blue dot at ({x}, {y})")
+    # Mouse movement disabled - only tracks on Discord
+    # frame = get_screen()
+    # h, w = frame.shape[:2]
+    # 
+    # dx = x - w // 2
+    # dy = y - h // 2
+    # dx = max(min(dx, 1000), -1000)
+    # dy = max(min(dy, 500), -500)
+    # 
+    # pyautogui.moveRel(dx, dy, duration=0.2)
+    pass
 
 
 # =========================
@@ -288,8 +301,10 @@ def move_to_blue_object(x, y):
 
 last_notification_time = 0
 last_status_log_time = 0
+last_screenshot_time = 0
 NOTIFICATION_COOLDOWN = 30  # Send Discord notification every 30 seconds when blue dots detected
 STATUS_LOG_INTERVAL = 120  # Send status log every 2 minutes (120 seconds)
+SCREENSHOT_INTERVAL = 60  # Send screenshot every 60 seconds
 frame_count = 0
 total_blue_detected = 0
 
@@ -321,6 +336,7 @@ def send_status_log(frame_count, total_blue_detected):
     }
     
     payload = {
+        "content": "<@&1493874821531045969>",
         "embeds": [embed]
     }
     
@@ -335,8 +351,38 @@ def send_status_log(frame_count, total_blue_detected):
 
 print("✅ Bot gestart — Druk CTRL+C om te stoppen")
 print("🔍 Scanning for blue dots/planes on the map...")
-print("📊 Status log will be sent every 2 minutes")
+print("📊 Only sends Discord messages when blue dots are detected")
 print("🖥️ Detection window disabled - monitoring in background")
+
+# TEST MODE: Capture one screenshot to verify detection
+print("\n📸 Capturing test screenshot...")
+test_frame = get_screen()
+test_blue_objects = find_blue_objects(test_frame)
+print(f"✅ Found {len(test_blue_objects)} blue objects in test screenshot")
+for idx, (x, y, area) in enumerate(test_blue_objects):
+    print(f"   [{idx+1}] Position: ({x}, {y}), Area: {area}")
+
+# Filter and save test screenshot
+valid_test_objects = []
+for x, y, area in test_blue_objects:
+    if x < 500 and y < 900:
+        print(f"   🚫 Filtered: UI element at ({x}, {y})")
+        continue
+    if not should_ignore_region(test_frame, x, y, area):
+        valid_test_objects.append((x, y, area))
+
+if valid_test_objects:
+    print(f"\n✅ Valid blue dots found: {len(valid_test_objects)}")
+    send_discord_notification(valid_test_objects, test_frame, test_frame.shape)
+else:
+    print(f"\n⚠️ No valid blue dots found in test screenshot (only save to file)")
+    # Create a copy of the frame to draw on
+    annotated_frame = test_frame.copy()
+    ui_x_max, ui_y_max = 600, 675
+    cv2.rectangle(annotated_frame, (0, 0), (ui_x_max, ui_y_max), (0, 165, 255), 3)
+    cv2.putText(annotated_frame, "IGNORED UI REGION", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
+    cv2.imwrite("blue_detection_screenshot.png", annotated_frame)
+    print("   Screenshot saved to: blue_detection_screenshot.png")
 
 # Create window and lock its position (disabled)
 # cv2.namedWindow("BOT VIEW - Blue Detection", cv2.WINDOW_NORMAL)
@@ -367,7 +413,7 @@ try:
         for x, y, area in blue_objects:
             # Ignore UI regions (top-left area where Legend/State of War are)
             # Expanded boundaries to catch more UI elements
-            if x < 500 and y < 400:
+            if x < 500 and y < 900:
                 ignored_count += 1
                 if frame_count % 30 == 0:
                     print(f"   🚫 Ignored UI element at ({x}, {y})")
@@ -394,8 +440,6 @@ try:
             
             # Draw green square around blue dot
             cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            # Draw yellow circle at center
-            cv2.circle(display_frame, (x, y), 5, (0, 255, 255), -1)
         
         # Don't display window on screen
         # cv2.imshow("BOT VIEW - Blue Detection", display_frame)
@@ -418,12 +462,14 @@ try:
                 send_discord_notification(valid_blue_objects, frame, frame.shape)
                 last_notification_time = current_time
         
+        # Screenshots only sent when pink dots detected (via send_discord_notification)
+        
         # Send status log every 2 minutes
-        current_time = time.time()
-        if current_time - last_status_log_time >= STATUS_LOG_INTERVAL:
-            send_status_log(frame_count, total_blue_detected)
-            last_status_log_time = current_time
-            frame_count = 0  # Reset frame count for next interval
+        # current_time = time.time()
+        # if current_time - last_status_log_time >= STATUS_LOG_INTERVAL:
+        #     send_status_log(frame_count, total_blue_detected)
+        #     last_status_log_time = current_time
+        #     frame_count = 0  # Reset frame count for next interval
         
         time.sleep(0.1)
 
